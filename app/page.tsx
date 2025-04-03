@@ -1,5 +1,6 @@
 import { getRegionRecordCount } from "./actions";
 import { RegionSeeder } from "./components/RegionSeeder";
+import { headers } from 'next/headers';
 
 const regions = [
   {
@@ -51,9 +52,26 @@ async function getInitialCounts() {
   return Object.fromEntries(counts);
 }
 
+async function getDeploymentRegion(): Promise<string> {
+  try {
+    const headersList = await headers();
+    const vercelId = headersList.get('x-vercel-id');
+    
+    if (!vercelId) return 'local';
+    
+    // x-vercel-id format is: {region}.{identifier}
+    // e.g., iad1.12345678
+    const region = vercelId.split('.')[0];
+    return region;
+  } catch (error) {
+    console.error('Error getting deployment region:', error);
+    return 'local';
+  }
+}
+
 export default async function Home() {
   const initialCounts = await getInitialCounts();
-  const deploymentRegion = process.env.VERCEL_REGION || 'local';
+  const deploymentRegion = await getDeploymentRegion();
   const regionDisplayName = regionNames[deploymentRegion] || `${deploymentRegion} (Unknown Region)`;
   
   return (
