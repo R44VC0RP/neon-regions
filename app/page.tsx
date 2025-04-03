@@ -59,9 +59,9 @@ async function getDeploymentRegion(): Promise<string> {
     
     if (!vercelId) return 'local';
     
-    // x-vercel-id format is: {region}.{identifier}
-    // e.g., iad1.12345678
-    const region = vercelId.split('.')[0];
+    // x-vercel-id format is: {region}::{identifier}
+    // e.g., iad1::cwtlb-1743699480801-778d98ff31ce
+    const region = vercelId.split('::')[0];
     return region;
   } catch (error) {
     console.error('Error getting deployment region:', error);
