@@ -1,7 +1,9 @@
 {
-  "functions": {
-    "app/api/sf/**": {
-      "regions": ["sfo1"]
+  "regions": ["sfo1"],
+  "routes": [
+    {
+      "src": "/api/sf/.*",
+      "dest": "/api/sf"
     }
-  }
+  ]
 } 
