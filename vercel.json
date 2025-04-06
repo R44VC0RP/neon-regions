@@ -1,0 +1,7 @@
+{
+  "functions": {
+    "app/api/sf/**": {
+      "regions": ["sfo1"]
+    }
+  }
+} 
