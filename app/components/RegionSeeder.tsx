@@ -2,7 +2,7 @@
 
 import { Button } from "@/components/ui/button";
 import { RegionCard } from "@/components/RegionCard";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { seedRegion, getRegionRecordCount } from "../actions";
 import Image from "next/image";
 
@@ -21,7 +21,16 @@ interface RegionSeederProps {
 export function RegionSeeder({ regions, initialCounts, deploymentRegion }: RegionSeederProps) {
   const [loading, setLoading] = useState(false);
   const [recordCounts, setRecordCounts] = useState<Record<string, number>>(initialCounts);
+  const [functionRegion, setFunctionRegion] = useState<string>('');
 
+  useEffect(() => {
+    const fetchFunctionRegion = async () => {
+      const region = await getFunctionRegion();
+      setFunctionRegion(region);
+    };
+    fetchFunctionRegion();
+  }, []);
+  
   const handleSeed = async () => {
     setLoading(true);
 
@@ -47,6 +56,19 @@ export function RegionSeeder({ regions, initialCounts, deploymentRegion }: Regio
     }
   };
 
+  const getFunctionRegion = async () => {
+    const response = await fetch('/api/region', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+    });
+    const data = await response.json();
+    return data.region;
+  };
+
+  
+
   return (
     <>
       <div className="flex justify-between items-center">
@@ -54,7 +76,8 @@ export function RegionSeeder({ regions, initialCounts, deploymentRegion }: Regio
           <h1 className="text-3xl font-bold">Database Regions</h1>
           <div className="bg-muted/50 rounded-lg px-3 py-1.5 text-sm text-muted-foreground flex items-center gap-2">
             <span>🌍</span>
-            <span className="font-mono">{deploymentRegion}</span>
+            <span className="font-mono">Deployment Region: {deploymentRegion} </span>
+            <span className="font-mono">Function Region: {functionRegion} </span>
           </div>
         </div>
         <Button 
