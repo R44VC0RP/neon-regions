@@ -1,9 +1,0 @@
-{
-  "regions": ["sfo1"],
-  "routes": [
-    {
-      "src": "/api/region/.*",
-      "dest": "/api/region"
-    }
-  ]
-} 

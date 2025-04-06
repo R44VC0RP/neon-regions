@@ -19,7 +19,7 @@ export function RegionCard({
   progress = 0
 }: RegionCardProps) {
   return (
-    <Card className="w-full max-w-sm">
+    <Card className="w-full ">
       <CardHeader>
         <CardTitle className="flex items-center justify-between">
           <span>{name}</span>
