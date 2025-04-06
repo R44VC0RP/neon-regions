@@ -2,8 +2,8 @@
   "regions": ["sfo1"],
   "routes": [
     {
-      "src": "/api/sf/.*",
-      "dest": "/api/sf"
+      "src": "/api/region/.*",
+      "dest": "/api/region"
     }
   ]
 } 

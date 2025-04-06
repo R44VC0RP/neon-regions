@@ -57,7 +57,7 @@ export function RegionSeeder({ regions, initialCounts, deploymentRegion }: Regio
   };
 
   const getFunctionRegion = async () => {
-    const response = await fetch('/api/sf', {
+    const response = await fetch('/api/region', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
