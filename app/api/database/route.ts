@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { getDbConnections } from '@/db';
 import { users, products, orders, orderItems } from '@/db/schema';
-import { and, eq, sql, desc } from 'drizzle-orm';
+import { and, eq, sql, desc, gte, between } from 'drizzle-orm';
 
 export async function GET(request: NextRequest) {
   const functionStart = Date.now();
@@ -26,37 +26,69 @@ export async function GET(request: NextRequest) {
   try {
     const dbStart = Date.now();
     
-    // Complex query example: Get order statistics with related data
+    // Enhanced order statistics with time-based metrics and advanced calculations
     const statsStart = Date.now();
     const orderStats = await db
       .select({
+        // Basic metrics
         totalOrders: sql<number>`count(distinct ${orders.id})`,
         totalRevenue: sql<number>`sum(${orders.total})`,
         avgOrderValue: sql<number>`avg(${orders.total})`,
         totalProducts: sql<number>`count(distinct ${orderItems.productId})`,
-        totalCustomers: sql<number>`count(distinct ${orders.userId})`
+        totalCustomers: sql<number>`count(distinct ${orders.userId})`,
+        
+        // Advanced metrics
+        revenuePerCustomer: sql<number>`sum(${orders.total})::float / count(distinct ${orders.userId})`,
+        avgItemsPerOrder: sql<number>`count(${orderItems.id})::float / count(distinct ${orders.id})`,
+        
+        // Time-based metrics
+        ordersLast24h: sql<number>`count(distinct case when ${orders.createdAt} >= now() - interval '24 hours' then ${orders.id} end)`,
+        revenueLast24h: sql<number>`sum(case when ${orders.createdAt} >= now() - interval '24 hours' then ${orders.total} else 0 end)`,
+        
+        // Status distribution
+        pendingOrders: sql<number>`count(case when ${orders.status} = 'pending' then 1 end)`,
+        completedOrders: sql<number>`count(case when ${orders.status} = 'completed' then 1 end)`,
+        
+        // Product metrics
+        avgProductPrice: sql<number>`avg(${products.price})`,
+        totalInventoryValue: sql<number>`sum(${products.price} * ${products.stock})`
       })
       .from(orders)
-      .leftJoin(orderItems, eq(orders.id, orderItems.orderId));
+      .leftJoin(orderItems, eq(orders.id, orderItems.orderId))
+      .leftJoin(products, eq(orderItems.productId, products.id));
     const statsTime = Date.now() - statsStart;
 
-    // Get top selling products
+    // Enhanced top products analysis
     const productsStart = Date.now();
     const topProducts = await db
       .select({
         productId: products.id,
         productName: products.name,
         totalSold: sql<number>`sum(${orderItems.quantity})`,
-        revenue: sql<number>`sum(${orderItems.quantity} * ${orderItems.price})`
+        revenue: sql<number>`sum(${orderItems.quantity} * ${orderItems.price})`,
+        averageOrderSize: sql<number>`avg(${orderItems.quantity})`,
+        totalOrders: sql<number>`count(distinct ${orders.id})`,
+        inStockValue: sql<number>`${products.price} * ${products.stock}`,
+        averageOrderValue: sql<number>`avg(${orderItems.quantity} * ${orderItems.price})`,
+        lastOrderDate: sql<string>`max(${orders.createdAt})`,
+        stockStatus: sql<string>`
+          CASE 
+            WHEN ${products.stock} = 0 THEN 'Out of Stock'
+            WHEN ${products.stock} < 10 THEN 'Low Stock'
+            WHEN ${products.stock} < 50 THEN 'Medium Stock'
+            ELSE 'Well Stocked'
+          END
+        `
       })
       .from(orderItems)
       .leftJoin(products, eq(orderItems.productId, products.id))
-      .groupBy(products.id, products.name)
-      .orderBy(sql`sum(${orderItems.quantity}) desc`)
+      .leftJoin(orders, eq(orderItems.orderId, orders.id))
+      .groupBy(products.id, products.name, products.price, products.stock)
+      .orderBy(sql`sum(${orderItems.quantity} * ${orderItems.price}) desc`)
       .limit(10);
     const productsTime = Date.now() - productsStart;
 
-    // Get recent orders with customer details
+    // Enhanced recent orders with detailed analysis
     const ordersStart = Date.now();
     const recentOrders = await db
       .select({
@@ -66,15 +98,44 @@ export async function GET(request: NextRequest) {
         status: orders.status,
         customerName: users.name,
         customerEmail: users.email,
-        itemCount: sql<number>`count(${orderItems.id})`
+        itemCount: sql<number>`count(${orderItems.id})`,
+        uniqueProducts: sql<number>`count(distinct ${orderItems.productId})`,
+        avgProductPrice: sql<number>`avg(${orderItems.price})`,
+        highestProductPrice: sql<number>`max(${orderItems.price})`,
+        lowestProductPrice: sql<number>`min(${orderItems.price})`,
+        totalQuantity: sql<number>`sum(${orderItems.quantity})`,
+        customerOrderCount: sql<number>`(
+          select count(*) from ${orders} o2 
+          where o2.user_id = ${orders.userId}
+        )`,
+        customerTotalSpent: sql<number>`(
+          select sum(total) from ${orders} o2 
+          where o2.user_id = ${orders.userId}
+        )`
       })
       .from(orders)
       .leftJoin(users, eq(orders.userId, users.id))
       .leftJoin(orderItems, eq(orders.id, orderItems.orderId))
       .groupBy(orders.id, users.id)
-      .orderBy(sql`${orders.createdAt} desc`)
+      .orderBy(desc(orders.createdAt))
       .limit(20);
     const ordersTime = Date.now() - ordersStart;
+
+    // Calculate hourly order trends
+    const trendsStart = Date.now();
+    const hourlyTrends = await db
+      .select({
+        hour: sql<string>`date_trunc('hour', ${orders.createdAt})`,
+        orderCount: sql<number>`count(distinct ${orders.id})`,
+        revenue: sql<number>`sum(${orders.total})`,
+        avgOrderValue: sql<number>`avg(${orders.total})`,
+        uniqueCustomers: sql<number>`count(distinct ${orders.userId})`
+      })
+      .from(orders)
+      .where(gte(orders.createdAt, sql`now() - interval '24 hours'`))
+      .groupBy(sql`date_trunc('hour', ${orders.createdAt})`)
+      .orderBy(sql`date_trunc('hour', ${orders.createdAt})`);
+    const trendsTime = Date.now() - trendsStart;
 
     const dbTime = Date.now() - dbStart;
     const functionTime = Date.now() - functionStart;
@@ -84,13 +145,15 @@ export async function GET(request: NextRequest) {
       stats: orderStats[0],
       topProducts,
       recentOrders,
+      hourlyTrends,
       timing: {
         total: functionTime,
         db: dbTime,
         queries: {
           stats: statsTime,
           products: productsTime,
-          orders: ordersTime
+          orders: ordersTime,
+          trends: trendsTime
         }
       },
       timestamp: new Date().toISOString()

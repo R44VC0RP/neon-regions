@@ -6,8 +6,8 @@ import { faker } from "@faker-js/faker";
 import { v4 as uuidv4 } from "uuid";
 import { sql } from "drizzle-orm";
 
-const BATCH_SIZE = 1000; // Increased batch size for better performance
-const TOTAL_RECORDS = 20000;
+const BATCH_SIZE = 2000; // Increased batch size for better performance
+const TOTAL_RECORDS = 100000; // Increased to 100k records
 const PARALLEL_BATCHES = 5; // Number of parallel batch inserts
 
 async function generateUsers(count: number, startIndex: number) {
@@ -108,11 +108,20 @@ export async function seedRegion(regionCode: string) {
   }
 
   console.log(`\n🚀 Starting to seed region: ${regionCode}`);
-  console.log(`📊 Target: ${TOTAL_RECORDS.toLocaleString()} records per table`);
-  console.log(`⚡ Batch size: ${BATCH_SIZE.toLocaleString()} records`);
-  console.log(`🔄 Parallel batches: ${PARALLEL_BATCHES}\n`);
-
+  console.log(`🗑️  Clearing existing data...`);
+  
   try {
+    // Delete all existing records in reverse order of dependencies
+    await db.delete(orderItems);
+    await db.delete(orders);
+    await db.delete(products);
+    await db.delete(users);
+    console.log(`✅ Existing data cleared\n`);
+
+    console.log(`📊 Target: ${TOTAL_RECORDS.toLocaleString()} records per table`);
+    console.log(`⚡ Batch size: ${BATCH_SIZE.toLocaleString()} records`);
+    console.log(`🔄 Parallel batches: ${PARALLEL_BATCHES}\n`);
+
     console.log('👤 Phase 1/4: Generating Users');
     const startUsers = Date.now();
     const insertedUsers = await insertInParallelBatches(
